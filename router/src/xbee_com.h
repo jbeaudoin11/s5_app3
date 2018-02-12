@@ -405,19 +405,187 @@ struct AtNDCommandResponsePacket {
 
 };
 typedef struct AtNDCommandResponsePacket AtNDCommandResponsePacket;
-
+//Page 104
 struct ZigbeeTransmitRequestPacket {
 
+    // Start Delemiter
+    byte start_delemiter = START_DELEMITER;
+
+    // Length
+    byte length_high;
+    byte length_low;
+    unsigned short length;
+
+    // Frame-specific Data
+    ApiFrameType frame_type;
+    byte frame_id;
+    byte dest_mac_addr[8];
+    byte dest_network_addr[2];
+    byte broadcast_radius;
+    byte options; 
+    byte rf_data[8];
+
+    // Checksum
+    byte cksm;
+
+    // Metadata
+    byte raw_packet[MAX_PACKET_LENGTH];
+    int raw_packet_length;
+
+    _BuildFromRawPacket(const byte _raw_packet[]){
+        start_delemiter = _raw_packet[0];
+
+        length_high = _raw_packet[1];
+        length_low = _raw_packet[2];
+        length = (length_high << 8) + length_low;
+
+        raw_packet_length = 3 + length + 1;
+
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+        frame_id = _raw_packet[4];
+        memcpy(dest_mac_addr , _raw_packet + 5, 8);
+        memcpy(dest_network_addr , _raw_packet + 13, 2);
+        
+        broadcast_radius = _raw_packet[15];
+        options = _raw_packet[16];
+        memcpy(rf_data, _raw_packet + 17, 8);
+
+        cksm = _raw_packet[raw_packet_length - 1];
+
+        memcpy(raw_packet, _raw_packet, raw_packet_length);
+    }
+
+    ZigbeeTransmitRequestPacket(const byte _raw_packet[]) {
+        _BuildFromRawPacket(_raw_packet);
+    }
+
+    ZigbeeTransmitRequestPacket(
+        const byte frame_id,
+        const byte dest_mac_addr[8],
+        const byte dest_network_addr[2],
+        const byte broadcast_radius,
+        const byte options,
+        const byte rf_data[8]
+    ) {
+        byte _raw_packet[MAX_PACKET_LENGTH];
+
+        _raw_packet[0] = START_DELEMITER;
+
+        _raw_packet[1] = 0;
+        _raw_packet[2] = 0x16;
+        
+        _raw_packet[3] = ZIGBEE_TRANSMIT_REQUEST;
+        _raw_packet[4] = frame_id;
+
+        memcpy(_raw_packet + 5, dest_mac_addr, 8);
+        memcpy(_raw_packet + 13, dest_network_addr, 2);
+        
+        _raw_packet[15] = broadcast_radius;
+
+        _raw_packet[16] = options;
+        memcpy(_raw_packet + 17, rf_data, 8);
+
+        _raw_packet[25] = _GetCheckSum(BasicPacket(_raw_packet));
+
+        _BuildFromRawPacket(_raw_packet);
+    }
 };
 typedef struct ZigbeeTransmitRequestPacket ZigbeeTransmitRequestPacket;
-
+//Page 111
 struct ZigbeeTransmitStatusPacket {
+
+    // Start Delemiter
+    byte start_delemiter = START_DELEMITER;
+
+    // Length
+    byte length_high;
+    byte length_low;
+    unsigned short length;
+
+    // Frame-specific Data
+    ApiFrameType frame_type;
+    byte frame_id;
+    byte dest_network_addr[2];
+    byte transmit_retry_count;
+    byte delivery_status; 
+    byte discovery_status;
+
+    // Checksum
+    byte cksm;
+
+    // Metadata
+    byte raw_packet[MAX_PACKET_LENGTH];
+    int raw_packet_length;
+
+    ZigbeeTransmitRequestPacket(const byte _raw_packet[]){
+        start_delemiter = _raw_packet[0];
+
+        length_high = _raw_packet[1];
+        length_low = _raw_packet[2];
+        length = (length_high << 8) + length_low;
+
+        raw_packet_length = 3 + length + 1;
+
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+        frame_id = _raw_packet[4];
+        memcpy(dest_network_addr , _raw_packet + 5, 2);
+        
+        transmit_retry_count = _raw_packet[7];
+        delivery_status = _raw_packet[8];
+        discovery_status = _raw_packet[9];
+
+        cksm = _raw_packet[raw_packet_length - 1];
+
+        memcpy(raw_packet, _raw_packet, raw_packet_length);
+    }
 
 };
 typedef struct ZigbeeTransmitStatusPacket ZigbeeTransmitStatusPacket;
-
+//Page 112
 struct ZigbeeReceivePacket {
 
+    // Start Delemiter
+    byte start_delemiter = START_DELEMITER;
+
+    // Length
+    byte length_high;
+    byte length_low;
+    unsigned short length;
+
+    // Frame-specific Data
+    ApiFrameType frame_type;
+    byte dest_mac_addr[8];
+    byte dest_network_addr[2];
+    byte options;
+    byte data[6]; 
+
+    // Checksum
+    byte cksm;
+
+    // Metadata
+    byte raw_packet[MAX_PACKET_LENGTH];
+    int raw_packet_length;
+
+    ZigbeeTransmitRequestPacket(const byte _raw_packet[]){
+        start_delemiter = _raw_packet[0];
+
+        length_high = _raw_packet[1];
+        length_low = _raw_packet[2];
+        length = (length_high << 8) + length_low;
+
+        raw_packet_length = 3 + length + 1;
+
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+        memcpy(dest_mac_addr , _raw_packet + 4, 8);
+        memcpy(dest_network_addr , _raw_packet + 12, 2);
+        
+        options = _raw_packet[14];
+        memcpy(data, _raw_packet + 15, 6);
+
+        cksm = _raw_packet[raw_packet_length - 1];
+
+        memcpy(raw_packet, _raw_packet, raw_packet_length);
+    }
 };
 typedef struct ZigbeeReceivePacket ZigbeeReceivePacket;
 
