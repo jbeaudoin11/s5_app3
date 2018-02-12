@@ -419,10 +419,10 @@ struct ZigbeeTransmitRequestPacket {
     // Frame-specific Data
     ApiFrameType frame_type;
     byte frame_id;
-    byte dest_max_addr [8];
-    byte des_16_addr[2];
+    byte dest_mac_addr[8];
+    byte dest_network_addr[2];
     byte broadcast_radius;
-    byte option; 
+    byte options; 
     byte rf_data[8];
 
     // Checksum
@@ -443,11 +443,11 @@ struct ZigbeeTransmitRequestPacket {
 
         frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
         frame_id = _raw_packet[4];
-        memcpy(dest_max_addr , _raw_packet + 5, 8);
+        memcpy(dest_mac_addr , _raw_packet + 5, 8);
         memcpy(dest_network_addr , _raw_packet + 13, 2);
         
         broadcast_radius = _raw_packet[15];
-        option = _raw_packet[16];
+        options = _raw_packet[16];
         memcpy(rf_data, _raw_packet + 17, 8);
 
         cksm = _raw_packet[raw_packet_length - 1];
@@ -461,10 +461,10 @@ struct ZigbeeTransmitRequestPacket {
 
     ZigbeeTransmitRequestPacket(
         const byte frame_id,
-        const byte dest_max_addr[8],
-        const byte des_16_addr[2],
+        const byte dest_mac_addr[8],
+        const byte dest_network_addr[2],
         const byte broadcast_radius,
-        const byte option,
+        const byte options,
         const byte rf_data[8]
     ) {
         byte _raw_packet[MAX_PACKET_LENGTH];
@@ -477,12 +477,12 @@ struct ZigbeeTransmitRequestPacket {
         _raw_packet[3] = ZIGBEE_TRANSMIT_REQUEST;
         _raw_packet[4] = frame_id;
 
-        memcpy(_raw_packet + 5, dest_max_addr, 8);
+        memcpy(_raw_packet + 5, dest_mac_addr, 8);
         memcpy(_raw_packet + 13, dest_network_addr, 2);
         
         _raw_packet[15] = broadcast_radius;
 
-        _raw_packet[16] = option;
+        _raw_packet[16] = options;
         memcpy(_raw_packet + 17, rf_data, 8);
 
         _raw_packet[25] = _GetCheckSum(BasicPacket(_raw_packet));
@@ -505,7 +505,7 @@ struct ZigbeeTransmitStatusPacket {
     // Frame-specific Data
     ApiFrameType frame_type;
     byte frame_id;
-    byte dest_network_addr [2];
+    byte dest_network_addr[2];
     byte transmit_retry_count;
     byte delivery_status; 
     byte discovery_status;
@@ -554,8 +554,8 @@ struct ZigbeeReceivePacket {
 
     // Frame-specific Data
     ApiFrameType frame_type;
-    byte dest_max_addr [8];
-    byte dest_network_addr [2];
+    byte dest_mac_addr[8];
+    byte dest_network_addr[2];
     byte options;
     byte data[6]; 
 
@@ -576,7 +576,7 @@ struct ZigbeeReceivePacket {
         raw_packet_length = 3 + length + 1;
 
         frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
-        memcpy(dest_max_addr , _raw_packet + 4, 8);
+        memcpy(dest_mac_addr , _raw_packet + 4, 8);
         memcpy(dest_network_addr , _raw_packet + 12, 2);
         
         options = _raw_packet[14];
