@@ -2,10 +2,14 @@
 #define XBEE_COM_H
 
 #include "mbed.h"
+#include <vector>
 
 #define START_DELEMITER 0x7E
 // #define MAX_PACKET_LENGTH 65539
 #define MAX_PACKET_LENGTH 512
+#define READ_TIMEOUT 5
+
+#define byte unsigned char
 
 enum ApiFrameType {
     AT_CMD = 0x08,
@@ -20,21 +24,25 @@ enum XbeeDeviceType {
 
 struct BasicPacket {
     // Start Delemiter
-    char start_delemiter = START_DELEMITER;
+    byte start_delemiter = START_DELEMITER;
 
     // Length
-    char length_high;
-    char length_low;
-    short length;
+    byte length_high;
+    byte length_low;
+    unsigned short length;
+
+    // Frame-specific Data
+    ApiFrameType frame_type;
+    byte content[MAX_PACKET_LENGTH];
 
     // Checksum
-    char cksm;
+    byte cksm;
 
     // Metadata
-    char raw_packet[MAX_PACKET_LENGTH];
+    byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
-    BasicPacket(const char _raw_packet[]) {
+    BasicPacket(const byte _raw_packet[]) {
 
         start_delemiter = _raw_packet[0];
 
@@ -42,6 +50,10 @@ struct BasicPacket {
         length_low = _raw_packet[2];
         length = (length_high << 8) + length_low;
         
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+
+        memcpy(content, _raw_packet + 3, length);
+
         raw_packet_length = 3 + length + 1;
 
         cksm = _raw_packet[raw_packet_length - 1];
@@ -52,42 +64,42 @@ struct BasicPacket {
 };
 typedef struct BasicPacket BasicPacket;
 
-char _GetCheckSum(
+byte _GetCheckSum(
     BasicPacket packet
 );
 
 // Ref page 117
 struct NodeIdentificationIndiactorPacket {
     // Start Delemiter
-    char start_delemiter = START_DELEMITER;
+    byte start_delemiter = START_DELEMITER;
 
     // Length
-    char length_high;
-    char length_low;
-    short length;
+    byte length_high;
+    byte length_low;
+    unsigned short length;
 
     // Frame-specific Data
     ApiFrameType frame_type;
-    char src_mac_addr[8];
-    char src_network_addr[2];
-    char res_options;
-    char res_src_network_addr[2];
-    char res_mac_addr[8];
-    char res_ni_string[2];
-    char res_parent_network_addr[2];
+    byte src_mac_addr[8];
+    byte src_network_addr[2];
+    byte res_options;
+    byte res_src_network_addr[2];
+    byte res_mac_addr[8];
+    byte res_ni_string[2];
+    byte res_parent_network_addr[2];
     XbeeDeviceType res_device_type;
-    char res_src_event;
-    char digi_profile_id[2];
-    char manifacturer_id[2];
+    byte res_src_event;
+    byte digi_profile_id[2];
+    byte manifacturer_id[2];
 
     // Checksum
-    char cksm;
+    byte cksm;
 
     // Metadata
-    char raw_packet[MAX_PACKET_LENGTH];
+    byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length = 36;
 
-    NodeIdentificationIndiactorPacket(const char _raw_packet[]) {
+    NodeIdentificationIndiactorPacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
@@ -137,27 +149,27 @@ typedef struct NodeIdentificationIndiactorPacket NodeIdentificationIndiactorPack
 // Ref page 102-103
 struct AtCommandPacket {
     // Start Delemiter
-    char start_delemiter = START_DELEMITER;
+    byte start_delemiter = START_DELEMITER;
 
     // Length
-    char length_high;
-    char length_low;
-    short length;
+    byte length_high;
+    byte length_low;
+    unsigned short length;
 
     // Frame-specific Data
     ApiFrameType frame_type;
-    char frame_id;
-    char at_command[2];
-    char at_command_value[256]; // optional
+    byte frame_id;
+    byte at_command[2];
+    byte at_command_value[256]; // optional
 
     // Checksum
-    char cksm;
+    byte cksm;
 
     // Metadata
-    char raw_packet[MAX_PACKET_LENGTH];
+    byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length = 8;
 
-    void _BuildFromRawPacket(const char _raw_packet[]) {
+    void _BuildFromRawPacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
@@ -177,16 +189,16 @@ struct AtCommandPacket {
         memcpy(raw_packet, _raw_packet, raw_packet_length);
     }
 
-    AtCommandPacket(const char _raw_packet[]) {
+    AtCommandPacket(const byte _raw_packet[]) {
         _BuildFromRawPacket(_raw_packet);
     }
 
     AtCommandPacket(
-        const char frame_id,
-        const char at_command[2]
+        const byte frame_id,
+        const byte at_command[2]
     ) {
 
-        char _raw_packet[MAX_PACKET_LENGTH];
+        byte _raw_packet[MAX_PACKET_LENGTH];
 
         _raw_packet[0] = START_DELEMITER;
 
@@ -205,18 +217,18 @@ struct AtCommandPacket {
     }
 
     AtCommandPacket(
-        const char frame_id,
-        const char at_command[2],
-        const char *at_command_data,
-        const short at_command_data_length
+        const byte frame_id,
+        const byte at_command[2],
+        const byte *at_command_data,
+        const unsigned short at_command_data_length
     ) {
-        char _raw_packet[MAX_PACKET_LENGTH];
+        byte _raw_packet[MAX_PACKET_LENGTH];
 
         _raw_packet[0] = START_DELEMITER;
 
-        short _length = 4 + at_command_data_length;
-        _raw_packet[1] = (char)(_length >> 8);
-        _raw_packet[2] = (char) _length;
+        unsigned short _length = 4 + at_command_data_length;
+        _raw_packet[1] = (byte)(_length >> 8);
+        _raw_packet[2] = (byte) _length;
         
         _raw_packet[3] = AT_CMD;
         _raw_packet[4] = frame_id;
@@ -235,31 +247,31 @@ struct AtCommandPacket {
 };
 typedef struct AtCommandPacket AtCommandPacket;
 
-// Ref page 110
+// Ref page 110 & 117
 struct AtCommandResponsePacket {
     // Start Delemiter
-    char start_delemiter = START_DELEMITER;
+    byte start_delemiter = START_DELEMITER;
 
     // Length
-    char length_high;
-    char length_low;
-    short length;
+    byte length_high;
+    byte length_low;
+    unsigned short length;
 
     // Frame-specific Data
     ApiFrameType frame_type;
-    char frame_id;
-    char at_command[2];
-    char at_command_status;
-    char at_command_data[256]; // optional
+    byte frame_id;
+    byte at_command[2];
+    byte at_command_status;
+    byte at_command_data[256]; // optional
 
     // Checksum
-    char cksm;
+    byte cksm;
 
     // Metadata
-    char raw_packet[MAX_PACKET_LENGTH];
+    byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
-    AtCommandResponsePacket(const char _raw_packet[]) {
+    AtCommandResponsePacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
@@ -277,7 +289,7 @@ struct AtCommandResponsePacket {
         raw_packet_length = 3 + length + 1;
 
         if(raw_packet_length > 9) {
-            short at_command_data_length = length - 5;
+            unsigned short at_command_data_length = length - 5;
             memcpy(at_command_data, _raw_packet + 8, at_command_data_length);
         }
 
@@ -289,25 +301,114 @@ struct AtCommandResponsePacket {
 };
 typedef struct AtCommandResponsePacket AtCommandResponsePacket;
 
-char _GetCheckSum(
+// Ref page 110
+struct AtNDCommandResponsePacket {
+    // Start Delemiter
+    byte start_delemiter = START_DELEMITER;
+
+    // Length
+    byte length_high;
+    byte length_low;
+    unsigned short length;
+
+    // Frame-specific Data
+    ApiFrameType frame_type;
+    byte frame_id;
+    byte at_command[2];
+    byte at_command_status;
+    byte at_command_data[256]; // optional
+
+    byte res_src_network_addr[2];
+    byte res_mac_addr[8];
+    byte res_ni_string[2];
+    byte res_parent_network_addr[2];
+    XbeeDeviceType res_device_type;
+    byte res_src_event;
+    byte digi_profile_id[2];
+    byte manifacturer_id[2];
+
+
+    // Checksum
+    byte cksm;
+
+    // Metadata
+    byte raw_packet[MAX_PACKET_LENGTH];
+    int raw_packet_length;
+
+    AtNDCommandResponsePacket(const byte _raw_packet[]) {
+        start_delemiter = _raw_packet[0];
+
+        length_high = _raw_packet[1];
+        length_low = _raw_packet[2];
+        length = (length_high << 8) + length_low;
+
+        // Frame-specific Data
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+        frame_id = _raw_packet[4];
+        at_command[0] = _raw_packet[5];
+        at_command[1] = _raw_packet[6];
+
+        at_command_status = _raw_packet[7];
+
+        raw_packet_length = 3 + length + 1;
+
+        if(raw_packet_length > 9) {
+            unsigned short at_command_data_length = length - 5;
+            memcpy(at_command_data, _raw_packet + 8, at_command_data_length);
+
+            res_src_network_addr[0] = _raw_packet[8];
+            res_src_network_addr[1] = _raw_packet[9];
+
+            memcpy(res_mac_addr, _raw_packet + 10, 8);
+
+            res_ni_string[0] = _raw_packet[18];
+            res_ni_string[1] = _raw_packet[19];
+
+            res_parent_network_addr[0] = _raw_packet[20];
+            res_parent_network_addr[1] = _raw_packet[21];
+
+            res_device_type = static_cast<XbeeDeviceType> (_raw_packet[22]);
+            res_src_event = _raw_packet[23];
+            
+            digi_profile_id[0] = _raw_packet[24];
+            digi_profile_id[1] = _raw_packet[25];
+            
+            manifacturer_id[0] = _raw_packet[26];
+            manifacturer_id[1] = _raw_packet[27];
+        }
+
+        cksm = _raw_packet[raw_packet_length - 1];
+
+        memcpy(raw_packet, _raw_packet, raw_packet_length);
+    }
+
+};
+typedef struct AtNDCommandResponsePacket AtNDCommandResponsePacket;
+
+byte _GetCheckSum(
     BasicPacket &packet
 );
 
-void _WriteString(
+void _WriteRawPacket(
     Serial &s,
-    const char raw_packet[],
+    const byte raw_packet[],
     const int length
 );
 
 int _ReadRawPacket(
     Serial &s,
-    char dest[]
+    byte dest[]
 );
 
-void DiscoverDevices(
+struct DiscoveredDevice {
+    XbeeDeviceType type;    
+    byte mac_addr[8];
+};
+typedef struct DiscoveredDevice DiscoveredDevice;
+
+vector<DiscoveredDevice> DiscoverDevices(
     Serial &s,
-    Serial &debug,
-    char device_mac[8]
+    Serial &debug
 );
 
 #endif 

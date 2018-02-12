@@ -1,11 +1,11 @@
 #include "xbee_com.h"
 
-// void WriteATcmd(Serial s, char[2] cmd, )
+// void WriteATcmd(Serial s, byte[2] cmd, )
 
-char _GetCheckSum(
+byte _GetCheckSum(
     BasicPacket packet
 ) {
-    char cksm = 0xFF;
+    byte cksm = 0xFF;
 
     for(int i=0; i<packet.length; i++) {
         cksm -= packet.raw_packet[3 + i];
@@ -16,7 +16,7 @@ char _GetCheckSum(
 
 void _WriteRawPacket(
     Serial &s,
-    const char raw_packet[],
+    const byte raw_packet[],
     const int length
 ) {
 
@@ -29,13 +29,21 @@ void _WriteRawPacket(
 
 int _ReadRawPacket(
     Serial &s,
-    char dest[]
+    byte dest[]
 ) {
+    Timer t;
+    t.start();
+
+    while(!s.readable()){
+        if(t.read() > READ_TIMEOUT) {
+            return 1; // TODO TIMEOUT
+        }
+    }
+
     dest[0] = s.getc();
 
     if(dest[0] != START_DELEMITER) {
-        // TODO error ??
-        return 1;
+        return 2; // TODO ignore ??
     }
 
     // Read length_high
@@ -51,22 +59,26 @@ int _ReadRawPacket(
     }
 
     // Read cksm
-    dest[3 + length] = s.getc();
+    byte cksm = s.getc();
+    dest[3 + length] = cksm;
 
-    // TODO verify checksum
+    if(_GetCheckSum(BasicPacket(dest)) != cksm) {
+        return 3; // TODO cksm error
+    }
 
     return 0;
 }
 
-void DiscoverDevices(
+
+
+vector<DiscoveredDevice> DiscoverDevices(
     Serial &s,
-    Serial &debug,
-    char device_mac[8]
+    Serial &debug
 ) {
     // Send AT ND 
     AtCommandPacket packet(
         0x01,
-        (const char[]){'N', 'D'}
+        (const byte[]){'N', 'D'}
     );
     _WriteRawPacket(
         s,
@@ -74,31 +86,32 @@ void DiscoverDevices(
         packet.raw_packet_length
     );
 
-    // Wait for the response
-    char buffer[256];
+    vector<DiscoveredDevice> devices;
 
-    _ReadRawPacket(s, buffer);
+    // Response buffer
+    byte buffer[MAX_PACKET_LENGTH];
 
-    AtCommandResponsePacket res(buffer);
+    // Wait for responses
+    while(true) {
+        if(_ReadRawPacket(s, buffer)) {
+            break;
+        }
 
-    debug.printf(
-        "Status -- %.2x -- %d\n\r",
-        res.at_command_status,
-        res.length
-    );
+        // BasicPacket p(buffer);
+        // for(int i=0; i<p.length; i++) {
+        //     debug.printf("%.2x", p.content[i]);
+        // }
+        // debug.printf("\n\r");
 
-    // // Decode the packet
-    // NodeIdentificationIndiactorPacket nii_packet(buffer);
+        AtNDCommandResponsePacket res(buffer);
 
-    // debug.printf(
-    //     "%.2x -- %.2x -- %d -- %.2x\n\r",
-    //     buffer[1],
-    //     buffer[2],
-    //     ((nii_packet.length_high << 8) + nii_packet.length_low),
-    //     buffer[3]
-    // );
+        DiscoveredDevice device;
 
-    // Extract data
-    // memcpy(device_mac, nii_packet.src_mac_addr, 8);
+        device.type = res.res_device_type;
+        memcpy(device.mac_addr, res.res_mac_addr, 8);
 
+        devices.push_back(device);
+    }   
+
+    return devices;    
 }
