@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "xbee_com.h"
-#include "Accel.h"
 
 
 Serial pc(USBTX, USBRX);
@@ -13,11 +12,8 @@ DigitalOut led_2(LED2);
 DigitalOut led_3(LED3);
 DigitalOut led_4(LED4);
 
-DigitalIn button(p20);
-
 byte coord_mac_addr[8] = {0};
 bool coord_mac_addr_is_valid = false;
-Accel acc(0x1D);
 
 
 void SetupCoordinatorMAC() {

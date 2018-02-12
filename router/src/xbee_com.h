@@ -1,8 +1,11 @@
 #ifndef XBEE_COM_H
 #define XBEE_COM_H
 
-#include "mbed.h"
 #include <vector>
+#include <queue>
+
+#include "mbed.h"
+#include "Accel.h"
 
 #define START_DELEMITER 0x7E
 // #define MAX_PACKET_LENGTH 65539
@@ -11,9 +14,27 @@
 
 #define byte unsigned char
 
+enum ApplicationState {
+    FUNCTION_LOOP,
+    READ,
+    READ_SENSORS,
+    ON_ZIGBEE_TRANSMIT_STATUS_PACKET,
+    ON_ZIGBEE_TRANSMIT_STATUS_PACKET_ERROR,
+    INVERT_LED_1,    
+    ON_ZIGBEE_RECEIVE_PACKET,
+    ON_AT_ND_COMMAND_RESPONSE_PACKET,
+    ON_AT_ND_COMMAND_RESPONSE_PACKET_ERROR,
+    WRITE_POP,
+    WRITE_NETWORK_DISCOVERY_PACKET,
+    WRITE_ZIGBEE_TRANSMIT_REQUEST,
+};
+
 enum ApiFrameType {
     AT_CMD = 0x08,
-    AT_CMD_RES = 0x88
+    AT_CMD_RES = 0x88,
+    ZIGBEE_TRANSMIT_REQUEST = 0x10,
+    ZIGBEE_TRANSMIT_STATUS = 0x8B,
+    ZIGBEE_RECEIVE = 0x90
 };
 
 enum XbeeDeviceType {
@@ -385,6 +406,23 @@ struct AtNDCommandResponsePacket {
 };
 typedef struct AtNDCommandResponsePacket AtNDCommandResponsePacket;
 
+struct ZigbeeTransmitRequestPacket {
+
+};
+typedef struct ZigbeeTransmitRequestPacket ZigbeeTransmitRequestPacket;
+
+struct ZigbeeTransmitStatusPacket {
+
+};
+typedef struct ZigbeeTransmitStatusPacket ZigbeeTransmitStatusPacket;
+
+struct ZigbeeReceivePacket {
+
+};
+typedef struct ZigbeeReceivePacket ZigbeeReceivePacket;
+
+
+
 byte _GetCheckSum(
     BasicPacket &packet
 );
@@ -395,9 +433,48 @@ void _WriteRawPacket(
     const int length
 );
 
-int _ReadRawPacket(
+enum ReadRawPacketStatus {
+    OK,
+    TIMEOUT,
+    IGNORE,
+    CKSM_ERROR
+};
+ReadRawPacketStatus _ReadRawPacket(
     Serial &s,
     byte dest[]
+);
+
+void _Read(
+    Serial &xbee,
+    const byte active_packet[MAX_PACKET_LENGTH],
+    const bool coord_mac_addr_is_valid,
+    ApplicationState &next_state
+);
+
+void _ReadAccelerometer(
+    char data[]
+);
+void _ReadButton(
+    char data[]
+);
+void _ReadSensors(
+    byte to_write_packet[MAX_PACKET_LENGTH]
+);
+
+void _OnZigbeeTransmitStatusPacket(
+    byte active_packet[MAX_PACKET_LENGTH],
+    ApplicationState &next_state
+);
+
+void _OnZigbeeReceivePacket(
+    byte active_packet[MAX_PACKET_LENGTH],
+    ApplicationState &next_state
+);
+
+void _OnATNDCommandResponsePacket(
+    byte active_packet[MAX_PACKET_LENGTH],
+    byte coord_mac_addr[8],
+    ApplicationState &next_state
 );
 
 struct DiscoveredDevice {
@@ -406,9 +483,16 @@ struct DiscoveredDevice {
 };
 typedef struct DiscoveredDevice DiscoveredDevice;
 
-vector<DiscoveredDevice> DiscoverDevices(
-    Serial &s,
-    Serial &debug
+vector<DiscoveredDevice> _DiscoverDevices(
+    Serial &s
+);
+
+void _DiscoverCoordonator(
+    Serial &s
+);
+
+void StateMachine(
+    Serial &xbee
 );
 
 #endif 
