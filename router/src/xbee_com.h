@@ -405,9 +405,9 @@ struct AtNDCommandResponsePacket {
 
 };
 typedef struct AtNDCommandResponsePacket AtNDCommandResponsePacket;
-
+//Page 104
 struct ZigbeeTransmitRequestPacket {
-    //Page 104
+
     // Start Delemiter
     byte start_delemiter = START_DELEMITER;
 
@@ -419,10 +419,10 @@ struct ZigbeeTransmitRequestPacket {
     // Frame-specific Data
     ApiFrameType frame_type;
     byte frame_id;
-    byte des_64_addr[8];
+    byte dest_max_addr [8];
     byte des_16_addr[2];
     byte broadcast_radius;
-    byte option; // optional
+    byte option; 
     byte rf_data[8];
 
     // Checksum
@@ -441,14 +441,14 @@ struct ZigbeeTransmitRequestPacket {
 
         raw_packet_length = 3 + length + 1;
 
-        frame_type = _raw_packet[3];
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
         frame_id = _raw_packet[4];
-        memcpy(des_64_addr, _raw_packet + 5, 8);
-        memcpy(des_16_addr, _raw_packet + 13, 2);
+        memcpy(dest_max_addr , _raw_packet + 5, 8);
+        memcpy(dest_network_addr , _raw_packet + 13, 2);
         
         broadcast_radius = _raw_packet[15];
         option = _raw_packet[16];
-        memcpy(des_16_addr, _raw_packet + 17, 8);
+        memcpy(rf_data, _raw_packet + 17, 8);
 
         cksm = _raw_packet[raw_packet_length - 1];
 
@@ -461,24 +461,39 @@ struct ZigbeeTransmitRequestPacket {
 
     ZigbeeTransmitRequestPacket(
         const byte frame_id,
-        const byte at_command[2]
+        const byte dest_max_addr[8],
+        const byte des_16_addr[2],
+        const byte broadcast_radius,
+        const byte option,
+        const byte rf_data[8]
     ) {
-        //TODO
-    }
+        byte _raw_packet[MAX_PACKET_LENGTH];
 
-    ZigbeeTransmitRequestPacket(
-        const byte frame_id,
-        const byte at_command[2],
-        const byte *at_command_data,
-        const unsigned short at_command_data_length
-    ) {    
-        //TODO
+        _raw_packet[0] = START_DELEMITER;
+
+        _raw_packet[1] = 0;
+        _raw_packet[2] = 0x16;
+        
+        _raw_packet[3] = ZIGBEE_TRANSMIT_REQUEST;
+        _raw_packet[4] = frame_id;
+
+        memcpy(_raw_packet + 5, dest_max_addr, 8);
+        memcpy(_raw_packet + 13, dest_network_addr, 2);
+        
+        _raw_packet[15] = broadcast_radius;
+
+        _raw_packet[16] = option;
+        memcpy(_raw_packet + 17, rf_data, 8);
+
+        _raw_packet[25] = _GetCheckSum(BasicPacket(_raw_packet));
+
+        _BuildFromRawPacket(_raw_packet);
     }
 };
 typedef struct ZigbeeTransmitRequestPacket ZigbeeTransmitRequestPacket;
-
+//Page 111
 struct ZigbeeTransmitStatusPacket {
-    //Page 111
+
     // Start Delemiter
     byte start_delemiter = START_DELEMITER;
 
@@ -490,7 +505,7 @@ struct ZigbeeTransmitStatusPacket {
     // Frame-specific Data
     ApiFrameType frame_type;
     byte frame_id;
-    byte des_16_addr[2];
+    byte dest_network_addr [2];
     byte transmit_retry_count;
     byte delivery_status; 
     byte discovery_status;
@@ -511,9 +526,9 @@ struct ZigbeeTransmitStatusPacket {
 
         raw_packet_length = 3 + length + 1;
 
-        frame_type = _raw_packet[3];
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
         frame_id = _raw_packet[4];
-        memcpy(des_16_addr, _raw_packet + 5, 2);
+        memcpy(dest_network_addr , _raw_packet + 5, 2);
         
         transmit_retry_count = _raw_packet[7];
         delivery_status = _raw_packet[8];
@@ -526,9 +541,9 @@ struct ZigbeeTransmitStatusPacket {
 
 };
 typedef struct ZigbeeTransmitStatusPacket ZigbeeTransmitStatusPacket;
-
+//Page 112
 struct ZigbeeReceivePacket {
-    //Page 112
+
     // Start Delemiter
     byte start_delemiter = START_DELEMITER;
 
@@ -539,9 +554,9 @@ struct ZigbeeReceivePacket {
 
     // Frame-specific Data
     ApiFrameType frame_type;
-    byte des_64_addr[8];
-    byte des_16_addr[2];
-    byte receive_options;
+    byte dest_max_addr [8];
+    byte dest_network_addr [2];
+    byte options;
     byte data[6]; 
 
     // Checksum
@@ -560,11 +575,11 @@ struct ZigbeeReceivePacket {
 
         raw_packet_length = 3 + length + 1;
 
-        frame_type = _raw_packet[3];
-        memcpy(des_64_addr, _raw_packet + 4, 8);
-        memcpy(des_16_addr, _raw_packet + 12, 2);
+        frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+        memcpy(dest_max_addr , _raw_packet + 4, 8);
+        memcpy(dest_network_addr , _raw_packet + 12, 2);
         
-        receive_options = _raw_packet[14];
+        options = _raw_packet[14];
         memcpy(data, _raw_packet + 15, 6);
 
         cksm = _raw_packet[raw_packet_length - 1];
