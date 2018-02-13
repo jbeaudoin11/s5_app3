@@ -1,16 +1,17 @@
 #ifndef XBEE_COM_H
 #define XBEE_COM_H
 
-#include <vector>
 #include <queue>
+#include <string>
+
 
 #include "mbed.h"
 #include "Accel.h"
 
 #define START_DELEMITER 0x7E
 // #define MAX_PACKET_LENGTH 65539
-#define MAX_PACKET_LENGTH 512
-#define READ_TIMEOUT 5
+#define MAX_PACKET_LENGTH 64
+#define READ_TIMEOUT 2
 
 #define byte unsigned char
 
@@ -43,6 +44,12 @@ enum XbeeDeviceType {
     END_DEVICE = 0x02
 };
 
+void DebugLog(
+    bool active,
+    char *msg,
+    ...
+);
+
 struct BasicPacket {
     // Start Delemiter
     byte start_delemiter = START_DELEMITER;
@@ -63,28 +70,39 @@ struct BasicPacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
+    #define DEBUG_BasicPacket_1 true    
     BasicPacket(const byte _raw_packet[]) {
-
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] ====== START BasicPacket ======\n\r");                                
+    
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
         length_low = _raw_packet[2];
         length = (length_high << 8) + length_low;
-        
+
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] Before static_cast<ApiFrameType>\n\r");   
         frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] After static_cast<ApiFrameType>\n\r");   
+        
 
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] Before content memcpy\n\r");   
         memcpy(content, _raw_packet + 3, length);
-
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] After content memcpy\n\r");                                
+        
         raw_packet_length = 3 + length + 1;
 
         cksm = _raw_packet[raw_packet_length - 1];
 
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] Before raw_packet memcpy\n\r");   
         memcpy(raw_packet, _raw_packet, raw_packet_length);
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] After raw_packet memcpy\n\r");  
 
+        DebugLog(DEBUG_BasicPacket_1, "[DEBUG] ====== END BasicPacket ======\n\r");                                
     }
 };
 typedef struct BasicPacket BasicPacket;
 
+#define DEBUG_GetCheckSum_1 false    
 byte _GetCheckSum(
     BasicPacket packet
 );
@@ -120,6 +138,7 @@ struct NodeIdentificationIndiactorPacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length = 36;
 
+    #define DEBUG_NodeIdentificationIndiactorPacket_1 false    
     NodeIdentificationIndiactorPacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
@@ -181,7 +200,7 @@ struct AtCommandPacket {
     ApiFrameType frame_type;
     byte frame_id;
     byte at_command[2];
-    byte at_command_value[256]; // optional
+    byte at_command_value[MAX_PACKET_LENGTH]; // optional
 
     // Checksum
     byte cksm;
@@ -190,6 +209,7 @@ struct AtCommandPacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length = 8;
 
+    #define DEBUG_AtCommandResponsePacket_BuildFromRawPacket false    
     void _BuildFromRawPacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
@@ -210,10 +230,12 @@ struct AtCommandPacket {
         memcpy(raw_packet, _raw_packet, raw_packet_length);
     }
 
+    #define DEBUG_AtCommandPacket_1 false    
     AtCommandPacket(const byte _raw_packet[]) {
         _BuildFromRawPacket(_raw_packet);
     }
 
+    #define DEBUG_AtCommandPacket_2 false    
     AtCommandPacket(
         const byte frame_id,
         const byte at_command[2]
@@ -237,6 +259,7 @@ struct AtCommandPacket {
         _BuildFromRawPacket(_raw_packet);
     }
 
+    #define DEBUG_AtCommandPacket_3 false    
     AtCommandPacket(
         const byte frame_id,
         const byte at_command[2],
@@ -283,7 +306,7 @@ struct AtCommandResponsePacket {
     byte frame_id;
     byte at_command[2];
     byte at_command_status;
-    byte at_command_data[256]; // optional
+    byte at_command_data[MAX_PACKET_LENGTH]; // optional
 
     // Checksum
     byte cksm;
@@ -292,6 +315,7 @@ struct AtCommandResponsePacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
+    #define DEBUG_AtCommandResponsePacket_1 false    
     AtCommandResponsePacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
@@ -337,7 +361,7 @@ struct AtNDCommandResponsePacket {
     byte frame_id;
     byte at_command[2];
     byte at_command_status;
-    byte at_command_data[256]; // optional
+    byte at_command_data[MAX_PACKET_LENGTH]; // optional
 
     byte res_src_network_addr[2];
     byte res_mac_addr[8];
@@ -356,6 +380,7 @@ struct AtNDCommandResponsePacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
+    #define DEBUG_AtNDCommandResponsePacket_1 false    
     AtNDCommandResponsePacket(const byte _raw_packet[]) {
         start_delemiter = _raw_packet[0];
 
@@ -432,7 +457,8 @@ struct ZigbeeTransmitRequestPacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
-    _BuildFromRawPacket(const byte _raw_packet[]){
+    #define DEBUG_ZigbeeTransmitRequestPacket_BuildFromRawPacket false    
+    void _BuildFromRawPacket(const byte _raw_packet[]){
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
@@ -455,10 +481,12 @@ struct ZigbeeTransmitRequestPacket {
         memcpy(raw_packet, _raw_packet, raw_packet_length);
     }
 
+    #define DEBUG_ZigbeeTransmitRequestPacket_1 false    
     ZigbeeTransmitRequestPacket(const byte _raw_packet[]) {
         _BuildFromRawPacket(_raw_packet);
     }
 
+    #define DEBUG_ZigbeeTransmitStatusPacket_2 false    
     ZigbeeTransmitRequestPacket(
         const byte frame_id,
         const byte dest_mac_addr[8],
@@ -517,7 +545,8 @@ struct ZigbeeTransmitStatusPacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
-    ZigbeeTransmitRequestPacket(const byte _raw_packet[]){
+    #define DEBUG_ZigbeeTransmitStatusPacket_1 false    
+    ZigbeeTransmitStatusPacket(const byte _raw_packet[]){
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
@@ -557,7 +586,11 @@ struct ZigbeeReceivePacket {
     byte dest_mac_addr[8];
     byte dest_network_addr[2];
     byte options;
-    byte data[6]; 
+    byte data[8]; 
+
+    // Custom application data
+    byte app_command;
+    byte app_command_data[7];
 
     // Checksum
     byte cksm;
@@ -566,7 +599,8 @@ struct ZigbeeReceivePacket {
     byte raw_packet[MAX_PACKET_LENGTH];
     int raw_packet_length;
 
-    ZigbeeTransmitRequestPacket(const byte _raw_packet[]){
+    #define DEBUG_ZigbeeReceivePacket_1 false    
+    ZigbeeReceivePacket(const byte _raw_packet[MAX_PACKET_LENGTH]){
         start_delemiter = _raw_packet[0];
 
         length_high = _raw_packet[1];
@@ -580,8 +614,13 @@ struct ZigbeeReceivePacket {
         memcpy(dest_network_addr , _raw_packet + 12, 2);
         
         options = _raw_packet[14];
-        memcpy(data, _raw_packet + 15, 6);
+        memcpy(data, _raw_packet + 15, 8);
 
+        // Application specific
+        app_command = _raw_packet[15];
+        memcpy(app_command_data, _raw_packet + 16, 7);
+
+        // Cksm
         cksm = _raw_packet[raw_packet_length - 1];
 
         memcpy(raw_packet, _raw_packet, raw_packet_length);
@@ -589,16 +628,15 @@ struct ZigbeeReceivePacket {
 };
 typedef struct ZigbeeReceivePacket ZigbeeReceivePacket;
 
-
-
+#define DEBUG_GetCheckSum false
 byte _GetCheckSum(
     BasicPacket &packet
 );
 
-void _WriteRawPacket(
-    Serial &s,
-    const byte raw_packet[],
-    const int length
+#define DEBUG_WriteBasicPacket false
+void _WriteBasicPacket(
+    Serial &xbee,
+    const BasicPacket &packet_to_write
 );
 
 enum ReadRawPacketStatus {
@@ -607,56 +645,55 @@ enum ReadRawPacketStatus {
     IGNORE,
     CKSM_ERROR
 };
+#define DEBUG_ReadRawPacket false
 ReadRawPacketStatus _ReadRawPacket(
-    Serial &s,
+    Serial &xbee,
     byte dest[]
 );
 
+#define DEBUG_Read false
 void _Read(
     Serial &xbee,
-    const byte active_packet[MAX_PACKET_LENGTH],
+    byte active_packet[MAX_PACKET_LENGTH],
     const bool coord_mac_addr_is_valid,
     ApplicationState &next_state
 );
 
+#define DEBUG_ReadAccelerometer false
 void _ReadAccelerometer(
     char data[]
 );
+#define DEBUG_ReadButton false
 void _ReadButton(
     char data[]
 );
+#define DEBUG_ReadSensors false
 void _ReadSensors(
-    byte to_write_packet[MAX_PACKET_LENGTH]
+    byte data[]
 );
 
+#define DEBUG_OnZigbeeTransmitStatusPacket false
 void _OnZigbeeTransmitStatusPacket(
     byte active_packet[MAX_PACKET_LENGTH],
     ApplicationState &next_state
 );
 
+#define DEBUG_OnZigbeeReceivePacket false
 void _OnZigbeeReceivePacket(
     byte active_packet[MAX_PACKET_LENGTH],
     ApplicationState &next_state
 );
 
+#define DEBUG_OnATNDCommandResponsePacket false
 void _OnATNDCommandResponsePacket(
     byte active_packet[MAX_PACKET_LENGTH],
     byte coord_mac_addr[8],
+    bool &coord_mac_addr_is_valid,
     ApplicationState &next_state
 );
 
-struct DiscoveredDevice {
-    XbeeDeviceType type;    
-    byte mac_addr[8];
-};
-typedef struct DiscoveredDevice DiscoveredDevice;
-
-vector<DiscoveredDevice> _DiscoverDevices(
-    Serial &s
-);
-
-void _DiscoverCoordonator(
-    Serial &s
+void _PrintState(
+    const ApplicationState &state
 );
 
 void StateMachine(
