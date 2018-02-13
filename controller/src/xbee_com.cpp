@@ -93,7 +93,7 @@ byte _read_retry = 0;
 void _Read(
     Serial &xbee,
     byte active_packet[MAX_PACKET_LENGTH],
-    const bool coord_mac_addr_is_valid,
+    const bool router_mac_addr_is_valid,
     ApplicationState &next_state
 ) {
     DebugLog(DEBUG_Read, "[DEBUG] ====== START _Read ======\n\r");     
@@ -104,7 +104,7 @@ void _Read(
 
     DebugLog(DEBUG_Read, "[DEBUG] frame_type %.2x\n\r", packet.frame_type);                                      
 
-    if(coord_mac_addr_is_valid) {
+    if(router_mac_addr_is_valid) {
 
         if(status != OK) {
             next_state = FUNCTION_LOOP;
@@ -175,41 +175,6 @@ void _Read(
     DebugLog(DEBUG_Read, "[DEBUG] ====== END _Read ======\n\r");                                  
 }
 
-DigitalIn _button(p20);
-Accel _acc(0x1D);
-
-void _ReadAccelerometer(
-    byte data[]
-) {
-    _acc.update();
-
-    data[1] = (byte) _acc.x();
-    data[2] = (byte) _acc.y();
-    data[3] = (byte) _acc.z();
-
-}
-
-void _ReadButton(
-    byte data[]
-) {
-    data[4] = (char) _button;
-}
-
-const int _sensor_functions_length = 2;
-typedef void (*VoidFunctionByteArray) (byte[]);
-VoidFunctionByteArray _sensor_functions[] {
-    _ReadAccelerometer,
-    _ReadButton
-};
-
-void _ReadSensors(
-    byte data[]
-) {
-    for(int i=0; i<_sensor_functions_length; i++) {
-        _sensor_functions[i](data);
-    }
-}
-
 void _OnZigbeeTransmitStatusPacket(
     byte active_packet[MAX_PACKET_LENGTH],
     ApplicationState &next_state
@@ -232,8 +197,8 @@ void _OnZigbeeReceivePacket(
 
     ZigbeeReceivePacket packet(active_packet);
 
-    if(packet.app_command == 0x00) {
-        next_state = INVERT_LED_1;
+    if(packet.app_command == 0x01) {
+        next_state = WEB_SOCKET_PUSH_SENSORS_DATA;
     } else {
         next_state = FUNCTION_LOOP;
     }
@@ -242,30 +207,54 @@ void _OnZigbeeReceivePacket(
 
 void _OnATNDCommandResponsePacket(
     byte active_packet[MAX_PACKET_LENGTH],
-    byte coord_mac_addr[8],
-    bool &coord_mac_addr_is_valid,
+    byte router_mac_addr[8],
+    bool &router_mac_addr_is_valid,
     ApplicationState &next_state
 ) {
     AtNDCommandResponsePacket packet(active_packet);
 
     if(
         packet.at_command_status == 0x00 &&
-        packet.res_device_type == COORDINATOR
+        packet.res_device_type == ROUTER
     ) {
 
-        memcpy(coord_mac_addr, packet.res_mac_addr, 8);
-        coord_mac_addr_is_valid = true;
+        memcpy(router_mac_addr, packet.res_mac_addr, 8);
+        router_mac_addr_is_valid = true;
         next_state = FUNCTION_LOOP;
 
     } else {
 
-        coord_mac_addr_is_valid = false;
+        router_mac_addr_is_valid = false;
         next_state = ON_AT_ND_COMMAND_RESPONSE_PACKET_ERROR;
 
     }
 
 }
 
+void _OnWebSocketPop(
+    byte active_packet[],
+    queue<BasicPacket> ws_queue
+) {
+// void _OnWebSocketPop(
+//     byte active_packet[],
+//     Websocket &ws,
+//     queue<BasicPacket> ws_queue
+// ) {
+    DebugLog(DEBUG_OnWebSocketPop, "[DEBUG] ====== START _OnWebSocketPushSensorsData ======\n\r");      
+
+    ZigbeeReceivePacket packet(active_packet);
+
+    DebugLog(DEBUG_OnWebSocketPop,
+        "[DEBUG] Sending : %d -- %d -- %d -- %d\n\r",
+        (signed char) packet.app_command_data[0],
+        (signed char) packet.app_command_data[1],
+        (signed char) packet.app_command_data[2],
+        packet.app_command_data[3]
+    );
+
+    DebugLog(DEBUG_OnWebSocketPop, "[DEBUG] ====== END _OnWebSocketPushSensorsData ======\n\r");      
+}
+    
 Serial _pc(USBTX, USBRX, NULL, 115200);
 void DebugLog(
     bool active,
@@ -293,20 +282,12 @@ void _PrintState(
             printf("READ\n\r");
             break;
         }
-        case READ_SENSORS: {
-            printf("READ_SENSORS\n\r");
-            break;
-        }
         case ON_ZIGBEE_TRANSMIT_STATUS_PACKET: {
             printf("ON_ZIGBEE_TRANSMIT_STATUS_PACKET\n\r");
             break;
         }
         case ON_ZIGBEE_TRANSMIT_STATUS_PACKET_ERROR: {
             printf("ON_ZIGBEE_TRANSMIT_STATUS_PACKET_ERROR\n\r");
-            break;
-        }
-        case INVERT_LED_1: {
-            printf("INVERT_LED_1\n\r");
             break;
         }
         case ON_ZIGBEE_RECEIVE_PACKET: {
@@ -329,8 +310,16 @@ void _PrintState(
             printf("WRITE_NETWORK_DISCOVERY_PACKET\n\r");
             break;
         }
-        case WRITE_APP_COMMAND_0x01_PACKET: {
-            printf("WRITE_APP_COMMAND_0x01_PACKET\n\r");
+        case WRITE_APP_COMMAND_0x00_PACKET: {
+            printf("WRITE_APP_COMMAND_0x00_PACKET\n\r");
+            break;
+        }
+        case WEB_SOCKET_PUSH_SENSORS_DATA: {
+            printf("WEB_SOCKET_PUSH_SENSORS_DATA\n\r");
+            break;
+        }
+        case WEB_SOCKET_POP: {
+            printf("WEB_SOCKET_POP\n\r");
             break;
         }
         default: {
@@ -342,7 +331,6 @@ void _PrintState(
 
 }
 
-
 DigitalOut led_1(LED1); //  app_command 0x00
 DigitalOut led_2(LED2);
 DigitalOut led_3(LED3);
@@ -351,25 +339,31 @@ DigitalOut led_4(LED4); // Error led 4
 void StateMachine(
     Serial &xbee
 ) {
+    // EthernetInterface eth;
+    // eth.init();
+    // eth.connect();
+
+    // Websocket ws("ws://192.168.0.201");
+    // ws.connect();
+
 
     ApplicationState current_state;
     ApplicationState next_state = WRITE_NETWORK_DISCOVERY_PACKET;
 
-    byte coord_mac_addr[8] = {0};
-    bool coord_mac_addr_is_valid = false;
+    byte router_mac_addr[8] = {0};
+    bool router_mac_addr_is_valid = false;
     int function_index = 0;
 
     byte active_packet[MAX_PACKET_LENGTH];
-    byte sensors_data[8] = {0x01}; /// 0x01 == sensors data app command
 
     queue<BasicPacket> write_queue;
+    queue<BasicPacket> ws_queue;
 
     Timer led_4_timer;
     led_4_timer.start();
 
-    bool sensors_new_data = false;
-    Timer sensors_timer;
-    sensors_timer.start();
+    Timer app_command_0_timer;
+    app_command_0_timer.start();
 
     while(true) {
         current_state = next_state;
@@ -393,17 +387,16 @@ void StateMachine(
                         break;
                     }
                     case 2: {
-                        next_state = READ_SENSORS;
+                        next_state = WRITE_APP_COMMAND_0x00_PACKET;
+                        break;
+                    }
+                    case 3: {
+                        next_state = WEB_SOCKET_POP;
                         break;
                     }
                 }
 
-                // printf("function_index %d\n\n", function_index);
-                function_index = (function_index + 1) % 3;
-
-                // if(coord_mac_addr_is_valid && function_index == 0) {
-                //     wait(10);
-                // }
+                function_index = (function_index + 1) % 4;
 
                 break;
             }
@@ -411,17 +404,9 @@ void StateMachine(
                 _Read(
                     xbee,
                     active_packet,
-                    coord_mac_addr_is_valid,
+                    router_mac_addr_is_valid,
                     next_state
                 );
-                break;
-            }
-            case READ_SENSORS: {
-                if(sensors_timer.read() > 1) {
-                    _ReadSensors(sensors_data);
-                    sensors_new_data = true;
-                }
-                next_state = WRITE_APP_COMMAND_0x01_PACKET;
                 break;
             }
             case ON_ZIGBEE_TRANSMIT_STATUS_PACKET: {
@@ -434,11 +419,6 @@ void StateMachine(
                 next_state = FUNCTION_LOOP;
                 break;
             }
-            case INVERT_LED_1: {
-                led_1 = !led_1;
-                next_state = FUNCTION_LOOP;
-                break;
-            }
             case ON_ZIGBEE_RECEIVE_PACKET: {
                 _OnZigbeeReceivePacket(active_packet, next_state);                 
                 break;
@@ -446,8 +426,8 @@ void StateMachine(
             case ON_AT_ND_COMMAND_RESPONSE_PACKET: {
                 _OnATNDCommandResponsePacket(
                     active_packet,
-                    coord_mac_addr,
-                    coord_mac_addr_is_valid,
+                    router_mac_addr,
+                    router_mac_addr_is_valid,
                     next_state
                 );                 
                 break;
@@ -465,7 +445,7 @@ void StateMachine(
                     write_queue.pop();
                 }
 
-                if(coord_mac_addr_is_valid) {
+                if(router_mac_addr_is_valid) {
                     next_state = FUNCTION_LOOP;
                 } else {
                     next_state = READ;
@@ -484,29 +464,38 @@ void StateMachine(
                 next_state = WRITE_POP;
                 break;
             }
-            case WRITE_APP_COMMAND_0x01_PACKET: {
+            case WRITE_APP_COMMAND_0x00_PACKET: {
 
-                if(sensors_new_data) {
+                if(app_command_0_timer.read() > APP_COMMAND_0_TIME) {
                     ZigbeeTransmitRequestPacket packet_to_write(
                         0x01,
-                        coord_mac_addr,
+                        router_mac_addr,
                         (const byte[]) {0xFF, 0xFE},
                         0x00,
                         0x00,
-                        sensors_data
+                        (const byte[]) {0x00, 0, 0, 0, 0, 0, 0, 0}// Make led_1 blink on router
                     );
 
                     write_queue.push(BasicPacket(packet_to_write.raw_packet));
 
-                    sensors_new_data = false;
-                    sensors_timer.reset();
+                    app_command_0_timer.reset();
                 }
                 
                 next_state = FUNCTION_LOOP;
                 break;
             }
+            case WEB_SOCKET_PUSH_SENSORS_DATA: {
+                ws_queue.push(BasicPacket(active_packet));                
+                next_state = FUNCTION_LOOP;                
+                break;
+            }
+            case WEB_SOCKET_POP: {
+                // _OnWebSocketPop(active_packet, ws, ws_queue);
+                _OnWebSocketPop(active_packet, ws_queue);
+                next_state = FUNCTION_LOOP;
+                break;
+            }
         }
-
     }
 
 }

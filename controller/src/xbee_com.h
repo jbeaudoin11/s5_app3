@@ -1,36 +1,36 @@
 // beaj2031 - merj2607
-
 #ifndef XBEE_COM_H
 #define XBEE_COM_H
 
 #include <queue>
-// #include <string>
-
+#include <string>
 
 #include "mbed.h"
-#include "Accel.h"
+// #include "EthernetInterface.h"
+// #include "Websocket.h"
 
 #define START_DELEMITER 0x7E
 // #define MAX_PACKET_LENGTH 65539
 #define MAX_PACKET_LENGTH 64
 #define READ_TIMEOUT 0.5
 #define MAX_READ_RETRY 10
+#define APP_COMMAND_0_TIME 1
 
 #define byte unsigned char
 
 enum ApplicationState {
     FUNCTION_LOOP,
     READ,
-    READ_SENSORS,
     ON_ZIGBEE_TRANSMIT_STATUS_PACKET,
     ON_ZIGBEE_TRANSMIT_STATUS_PACKET_ERROR,
-    INVERT_LED_1,    
     ON_ZIGBEE_RECEIVE_PACKET,
     ON_AT_ND_COMMAND_RESPONSE_PACKET,
     ON_AT_ND_COMMAND_RESPONSE_PACKET_ERROR,
     WRITE_POP,
     WRITE_NETWORK_DISCOVERY_PACKET,
-    WRITE_APP_COMMAND_0x01_PACKET,
+    WRITE_APP_COMMAND_0x00_PACKET,
+    WEB_SOCKET_PUSH_SENSORS_DATA,
+    WEB_SOCKET_POP,
 };
 
 enum ApiFrameType {
@@ -109,85 +109,6 @@ typedef struct BasicPacket BasicPacket;
 byte _GetCheckSum(
     BasicPacket packet
 );
-
-// // Ref page 117
-// struct NodeIdentificationIndiactorPacket {
-//     // Start Delemiter
-//     byte start_delemiter = START_DELEMITER;
-
-//     // Length
-//     byte length_high;
-//     byte length_low;
-//     unsigned short length;
-
-//     // Frame-specific Data
-//     ApiFrameType frame_type;
-//     byte src_mac_addr[8];
-//     byte src_network_addr[2];
-//     byte res_options;
-//     byte res_src_network_addr[2];
-//     byte res_mac_addr[8];
-//     byte res_ni_string[2];
-//     byte res_parent_network_addr[2];
-//     XbeeDeviceType res_device_type;
-//     byte res_src_event;
-//     byte digi_profile_id[2];
-//     byte manifacturer_id[2];
-
-//     // Checksum
-//     byte cksm;
-
-//     // Metadata
-//     byte raw_packet[MAX_PACKET_LENGTH];
-//     int raw_packet_length = 36;
-
-//     #define DEBUG_NodeIdentificationIndiactorPacket_1 false    
-//     NodeIdentificationIndiactorPacket(const byte _raw_packet[]) {
-//         start_delemiter = _raw_packet[0];
-
-//         length_high = _raw_packet[1];
-//         length_low = _raw_packet[2];
-//         length = (length_high << 8) + length_low;
-
-//         frame_type = static_cast<ApiFrameType> (_raw_packet[3]);
-
-//         memcpy(src_mac_addr, _raw_packet + 4, 8);
-
-//         src_network_addr[0] = _raw_packet[12];
-//         src_network_addr[1] = _raw_packet[13];
-
-//         res_options = _raw_packet[14];
-
-//         res_src_network_addr[0] = _raw_packet[15];
-//         res_src_network_addr[1] = _raw_packet[16];
-
-//         memcpy(res_mac_addr, _raw_packet + 17, 8);
-
-//         res_ni_string[0] = _raw_packet[25];
-//         res_ni_string[1] = _raw_packet[26];
-
-//         res_parent_network_addr[0] = _raw_packet[27];
-//         res_parent_network_addr[1] = _raw_packet[28];
-
-//         res_device_type = static_cast<XbeeDeviceType> (_raw_packet[29]);
-//         res_src_event = _raw_packet[30];
-        
-//         digi_profile_id[0] = _raw_packet[31];
-//         digi_profile_id[1] = _raw_packet[32];
-        
-//         manifacturer_id[0] = _raw_packet[33];
-//         manifacturer_id[1] = _raw_packet[34];
-
-//         cksm = _raw_packet[35];
-
-//         // Fixed size
-//         raw_packet_length = 36;
-//         memcpy(raw_packet, _raw_packet, raw_packet_length);
-
-//     }
-
-// };
-// typedef struct NodeIdentificationIndiactorPacket NodeIdentificationIndiactorPacket;
 
 // Ref page 102-103
 struct AtCommandPacket {
@@ -658,21 +579,8 @@ ReadRawPacketStatus _ReadRawPacket(
 void _Read(
     Serial &xbee,
     byte active_packet[MAX_PACKET_LENGTH],
-    const bool coord_mac_addr_is_valid,
+    const bool router_mac_addr_is_valid,
     ApplicationState &next_state
-);
-
-#define DEBUG_ReadAccelerometer false
-void _ReadAccelerometer(
-    char data[]
-);
-#define DEBUG_ReadButton false
-void _ReadButton(
-    char data[]
-);
-#define DEBUG_ReadSensors false
-void _ReadSensors(
-    byte data[]
 );
 
 #define DEBUG_OnZigbeeTransmitStatusPacket false
@@ -690,9 +598,14 @@ void _OnZigbeeReceivePacket(
 #define DEBUG_OnATNDCommandResponsePacket false
 void _OnATNDCommandResponsePacket(
     byte active_packet[MAX_PACKET_LENGTH],
-    byte coord_mac_addr[8],
-    bool &coord_mac_addr_is_valid,
+    byte router_mac_addr[8],
+    bool &router_mac_addr_is_valid,
     ApplicationState &next_state
+);
+#define DEBUG_OnWebSocketPop true
+void _OnWebSocketPop(
+    byte active_packet[],
+    queue<BasicPacket> ws_queue
 );
 
 void _PrintState(

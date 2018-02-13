@@ -1,13 +1,11 @@
-#include <mbed.h>
+// beaj2031 - merj2607
+#include "xbee_com.h"
 
-Serial pc(USBTX, USBRX);
-Serial uart(p13, p14);
+
+Serial xbee(p13, p14);
 
 int main() {
+    printf("\n\r\n\r== START ==\n\r");
 
-    // put your setup code here, to run once:
-
-    while(1) {
-        // put your main code here, to run repeatedly:
-    }
+    StateMachine(xbee);
 }
